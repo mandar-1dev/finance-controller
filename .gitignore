@@ -1,0 +1,6 @@
+data/
+*.exe
+/fc-server
+/fc-reconcile
+/fc-seed
+.DS_Store
