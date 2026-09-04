@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>AI Finance Controller</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0A0E14;
+    --panel: #0F141C;
+    --panel-raised: #131924;
+    --line: #1C232E;
+    --text: #E9EDF2;
+    --dim: #69748A;
+    --dimmer: #3E4759;
+    --teal: #3FD9C0;
+    --teal-dim: rgba(63,217,192,.12);
+    --amber: #E8A93D;
+    --amber-dim: rgba(232,169,61,.12);
+    --red: #E8636B;
+    --red-dim: rgba(232,99,107,.12);
+    --indigo: #7B8CFF;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Space Grotesk', -apple-system, sans-serif;
+    font-size: 14px; line-height: 1.5;
+    display: flex; min-height: 100vh;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  ::selection { background: var(--teal-dim); color: var(--teal); }
+  :focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  nav.rail {
+    width: 220px; flex-shrink: 0; background: var(--panel);
+    border-right: 1px solid var(--line); padding: 24px 14px;
+    display: flex; flex-direction: column; gap: 4px;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .brand { padding: 4px 10px 22px; }
+  .brand .name { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+  .brand .sub { color: var(--dim); font-size: 11px; margin-top: 3px; }
+  .rail button {
+    all: unset; cursor: pointer; padding: 9px 10px; border-radius: 8px;
+    color: var(--dim); font-size: 13px; font-weight: 500;
+    display: flex; align-items: center; gap: 9px; transition: background .12s, color .12s;
+  }
+  .rail button:hover { background: var(--panel-raised); color: var(--text); }
+  .rail button.active { background: var(--teal-dim); color: var(--teal); }
+  .rail button .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .6; flex-shrink: 0; }
+  .rail .spacer { flex: 1; }
+  .rail .env { font-size: 11px; color: var(--dimmer); padding: 10px; border-top: 1px solid var(--line); margin-top: 10px; }
+
+  main { flex: 1; min-width: 0; padding: 28px 36px 60px; max-width: 1180px; }
+  .topbar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 26px; gap: 16px; }
+  .topbar h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  .topbar p { color: var(--dim); font-size: 13px; margin-top: 4px; max-width: 46ch; }
+  .topbar .actions { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+  #runBtn, #reseedBtn {
+    all: unset; cursor: pointer; padding: 10px 20px; border-radius: 9px; font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px; white-space: nowrap;
+    transition: transform .1s ease, box-shadow .15s ease;
+  }
+  #runBtn { background: var(--teal); color: #04231D; }
+  #runBtn:hover { box-shadow: 0 0 0 4px var(--teal-dim); }
+  #reseedBtn { background: var(--panel-raised); color: var(--text); border: 1px solid var(--line); }
+  #reseedBtn:hover { border-color: var(--indigo); box-shadow: 0 0 0 4px rgba(123,140,255,.12); }
+  #runBtn:active, #reseedBtn:active { transform: scale(.97); }
+  #runBtn.running, #reseedBtn.running { opacity: .7; pointer-events: none; }
+  #runBtn svg, #reseedBtn svg { width: 14px; height: 14px; }
+  .seed-tag { color: var(--dimmer); font-size: 11px; margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+
+  section.view { display: none; animation: viewIn .25s ease; }
+  section.view.active { display: block; }
+  @keyframes viewIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  .sweep { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px 26px; margin-bottom: 24px; position: relative; overflow: hidden; }
+  .sweep-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 18px; }
+  .sweep-col { text-align: center; }
+  .sweep-col .n { font-family: 'JetBrains Mono', monospace; font-size: 30px; font-weight: 600; }
+  .sweep-col .l { color: var(--dim); font-size: 11px; margin-top: 4px; }
+  .sweep-mid { width: 100%; height: 46px; }
+  .sweep-mid svg { width: 100%; height: 100%; overflow: visible; }
+  .flow-path { fill: none; stroke: var(--dimmer); stroke-width: 1.5; }
+  .flow-path.active { stroke: var(--teal); }
+  .flow-dot { opacity: 0; }
+  .flow-dot.run { animation: flowDot 1.1s ease forwards; }
+  @keyframes flowDot {
+    0% { opacity: 0; offset-distance: 0%; }
+    12% { opacity: 1; }
+    88% { opacity: 1; }
+    100% { opacity: 0; offset-distance: 100%; }
+  }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 12px; margin-bottom: 22px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 15px 17px; transition: border-color .15s; }
+  .card:hover { border-color: var(--dimmer); }
+  .card .label { color: var(--dim); font-size: 11.5px; }
+  .card .value { font-family: 'JetBrains Mono', monospace; font-size: 24px; font-weight: 600; margin-top: 6px; letter-spacing: -0.01em; }
+  .card .value.teal { color: var(--teal); }
+  .card .value.amber { color: var(--amber); }
+  .card .value.red { color: var(--red); }
+
+  .cash-strip { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 12px; margin-bottom: 22px; }
+  .cash-card { border-radius: 12px; padding: 16px 18px; border: 1px solid var(--line); }
+  .cash-card.reconciled { background: var(--teal-dim); border-color: rgba(63,217,192,.25); }
+  .cash-card.pending { background: var(--amber-dim); border-color: rgba(232,169,61,.25); }
+  .cash-card .label { font-size: 11.5px; color: var(--dim); }
+  .cash-card .amount { font-family: 'JetBrains Mono', monospace; font-size: 21px; font-weight: 600; margin-top: 6px; }
+  .cash-card.reconciled .amount { color: var(--teal); }
+  .cash-card.pending .amount { color: var(--amber); }
+
+  .summary-box { background: linear-gradient(135deg, var(--panel) 0%, var(--panel-raised) 100%); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin-bottom: 24px; display: flex; gap: 14px; align-items: flex-start; }
+  .summary-box .icon { width: 28px; height: 28px; border-radius: 8px; background: var(--indigo); flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+  .summary-box .icon svg { width: 15px; height: 15px; color: white; }
+  .summary-box .body h3 { font-size: 12.5px; color: var(--dim); font-weight: 500; margin-bottom: 6px; }
+  .summary-box .body p { font-size: 14px; line-height: 1.6; color: var(--text); }
+  .summary-box .body p.placeholder { color: var(--dim); font-style: italic; }
+
+  h2.section-title { font-size: 13px; color: var(--dim); font-weight: 500; margin: 24px 0 10px; display: flex; align-items: center; justify-content: space-between; }
+  h2.section-title .count { color: var(--dimmer); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
+  .toolbar input, .toolbar select { all: unset; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 12.5px; color: var(--text); font-family: inherit; }
+  .toolbar input { flex: 1; }
+  .toolbar input::placeholder { color: var(--dimmer); }
+  .toolbar select { cursor: pointer; }
+  .toolbar button { all: unset; cursor: pointer; padding: 8px 14px; border-radius: 8px; font-size: 12.5px; background: var(--panel); border: 1px solid var(--line); color: var(--dim); display: flex; align-items: center; gap: 6px; transition: color .12s, border-color .12s; }
+  .toolbar button:hover { color: var(--text); border-color: var(--dimmer); }
+
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 10px 13px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+  th { color: var(--dim); font-weight: 500; font-size: 11px; background: var(--panel-raised); }
+  tr:last-child td { border-bottom: none; }
+  tr.row { transition: background .1s; }
+  tr.row:hover td { background: var(--panel-raised); }
+  td.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .tag { display: inline-block; padding: 3px 9px; border-radius: 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .01em; }
+  .tag.exception { background: var(--red-dim); color: var(--red); }
+  .tag.match-exact { background: var(--teal-dim); color: var(--teal); }
+  .tag.match-fuzzy { background: var(--amber-dim); color: var(--amber); }
+  .tag.risk-high { background: var(--red-dim); color: var(--red); }
+  .tag.risk-medium { background: var(--amber-dim); color: var(--amber); }
+  .tag.risk-low { background: rgba(105,116,138,.15); color: var(--dim); }
+  .reasoning { color: var(--dim); font-size: 12px; max-width: 420px; }
+  .empty { color: var(--dimmer); padding: 32px; text-align: center; font-size: 13px; }
+
+  .reason-bars { display: flex; flex-direction: column; gap: 8px; margin-bottom: 22px; }
+  .reason-bar-row { display: grid; grid-template-columns: 200px 1fr 40px; align-items: center; gap: 10px; }
+  .reason-bar-row .name { font-size: 12px; color: var(--dim); }
+  .reason-bar-track { height: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+  .reason-bar-fill { height: 100%; background: var(--amber); border-radius: 5px; width: 0%; transition: width .5s cubic-bezier(.16,1,.3,1); }
+  .reason-bar-row .n { font-family: 'JetBrains Mono', monospace; font-size: 12px; text-align: right; color: var(--dim); }
+
+  .audit-log { display: flex; flex-direction: column; gap: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; max-height: 560px; overflow-y: auto; }
+  .audit-entry { display: grid; grid-template-columns: 150px 90px 1fr; gap: 12px; padding: 9px 14px; border-bottom: 1px solid var(--line); font-size: 12px; }
+  .audit-entry:last-child { border-bottom: none; }
+  .audit-entry .ts { color: var(--dimmer); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .audit-entry .action { font-weight: 600; }
+  .audit-entry .action.match { color: var(--teal); }
+  .audit-entry .action.exception { color: var(--red); }
+  .audit-entry .action.run_start, .audit-entry .action.run_end { color: var(--indigo); }
+  .audit-entry .action.llm_assist { color: var(--amber); }
+  .audit-entry .detail { color: var(--dim); }
+
+  @media (prefers-reduced-motion: reduce) { * { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
+  @media (max-width: 760px) {
+    body { flex-direction: column; }
+    nav.rail { width: 100%; height: auto; flex-direction: row; overflow-x: auto; position: static; }
+    .brand, .rail .env { display: none; }
+    main { padding: 20px; }
+    .cash-strip { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="rail">
+  <div class="brand">
+    <div class="name">Finance Controller</div>
+    <div class="sub">Reconciliation agent</div>
+  </div>
+  <button data-view="overview" class="active"><span class="dot"></span>Overview</button>
+  <button data-view="priority"><span class="dot"></span>Priority queue</button>
+  <button data-view="exceptions"><span class="dot"></span>Exceptions</button>
+  <button data-view="matches"><span class="dot"></span>Matches</button>
+  <button data-view="audit"><span class="dot"></span>Audit trail</button>
+  <div class="spacer"></div>
+  <div class="env">Gateway &harr; Ledger<br/>reconciliation, offline-first</div>
+</nav>
+
+<main>
+  <div class="topbar">
+    <div>
+      <h1>Reconciliation run</h1>
+      <p>Matches gateway settlements against ledger credits, explains every decision, and never drops a record silently.</p>
+    </div>
+    <div class="actions">
+      <div>
+        <button id="reseedBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+          <span id="reseedBtnLabel">New synthetic batch</span>
+        </button>
+        <div class="seed-tag" id="seedTag">no batch generated yet</div>
+      </div>
+      <button id="runBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span id="runBtnLabel">Run reconciliation</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="sweep">
+    <div class="sweep-row">
+      <div class="sweep-col">
+        <div class="n mono" id="sweepGateway">-</div>
+        <div class="l">Gateway records</div>
+      </div>
+      <div class="sweep-mid">
+        <svg viewBox="0 0 300 46" preserveAspectRatio="none">
+          <path id="pathTop" class="flow-path" d="M 0 8 C 100 8, 150 23, 300 23" />
+          <path id="pathBot" class="flow-path" d="M 0 38 C 100 38, 150 23, 300 23" />
+          <circle id="dotTop" class="flow-dot mono" r="3" fill="#3FD9C0" style="offset-path: path('M 0 8 C 100 8, 150 23, 300 23');" />
+          <circle id="dotBot" class="flow-dot mono" r="3" fill="#E8A93D" style="offset-path: path('M 0 38 C 100 38, 150 23, 300 23');" />
+        </svg>
+      </div>
+      <div class="sweep-col">
+        <div class="n mono" id="sweepLedger">-</div>
+        <div class="l">Ledger records</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary-box">
+    <div class="icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2 L14 9 L21 9 L15.5 13.5 L17.5 21 L12 16.5 L6.5 21 L8.5 13.5 L3 9 L10 9 Z"/></svg>
+    </div>
+    <div class="body">
+      <h3>AI executive summary</h3>
+      <p id="summaryText" class="placeholder">Run reconciliation to generate a plain-English summary of this batch.</p>
+    </div>
+  </div>
+
+  <section class="view active" id="view-overview">
+    <div class="grid" id="metricGrid"></div>
+    <div class="cash-strip" id="cashStrip"></div>
+    <h2 class="section-title">Money at risk, by reason</h2>
+    <div class="reason-bars" id="reasonBars"></div>
+  </section>
+
+  <section class="view" id="view-priority">
+    <h2 class="section-title">AI investigation priority <span class="count" id="pCount"></span></h2>
+    <p style="color:var(--dim);font-size:12.5px;margin-bottom:12px;max-width:60ch;">
+      Ranked by a deterministic risk score — 80% exception type severity, 20% amount exposure
+      relative to this batch. A small duplicate settlement still outranks a large delayed one:
+      type predicts what kind of action is needed; amount predicts how much it matters once
+      you're looking at it.
+    </p>
+    <table id="pTable"><thead><tr><th>Risk</th><th>Score</th><th>Kind</th><th>Record</th><th>Amount</th><th>Reason</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="view" id="view-exceptions">
+    <h2 class="section-title">Open exceptions <span class="count" id="exCount"></span></h2>
+    <div class="toolbar">
+      <input id="exSearch" type="text" placeholder="Filter by record ID or reasoning..." />
+      <select id="exReasonFilter"><option value="">All reasons</option></select>
+      <button id="exportCsvBtn">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16"/></svg>
+        Export CSV
+      </button>
+    </div>
+    <table id="exTable"><thead><tr><th>Kind</th><th>Record</th><th>Reason</th><th>Reasoning</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="view" id="view-matches">
+    <h2 class="section-title">Matched records <span class="count" id="mCount"></span></h2>
+    <div class="toolbar">
+      <input id="mSearch" type="text" placeholder="Filter by gateway or ledger ID..." />
+    </div>
+    <table id="mTable"><thead><tr><th>Gateway</th><th>Ledger</th><th>Confidence</th><th>Reasoning</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="view" id="view-audit">
+    <h2 class="section-title">Audit trail <span class="count" id="aCount"></span></h2>
+    <div class="audit-log" id="auditLog"></div>
+  </section>
+</main>
+
+<script>
+let state = { report: null, exceptions: [], matches: [], audit: [], priority: [] };
+
+document.querySelectorAll('.rail button[data-view]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.rail button[data-view]').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('section.view').forEach(v => v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-' + btn.dataset.view).classList.add('active');
+  });
+});
+
+async function run() {
+  const btn = document.getElementById('runBtn');
+  btn.classList.add('running');
+  document.getElementById('runBtnLabel').textContent = 'Running...';
+  playSweep();
+  try {
+    await fetch('/api/run', { method: 'POST' });
+    await Promise.all([load(), loadSummary()]);
+  } finally {
+    btn.classList.remove('running');
+    document.getElementById('runBtnLabel').textContent = 'Run reconciliation';
+  }
+}
+
+async function reseedAndRun() {
+  const btn = document.getElementById('reseedBtn');
+  btn.classList.add('running');
+  document.getElementById('reseedBtnLabel').textContent = 'Generating...';
+  try {
+    const res = await fetch('/api/reseed', { method: 'POST' }).then(r => r.json());
+    document.getElementById('seedTag').textContent =
+      `seed ${res.seed} — ${res.gateway} gateway / ${res.ledger} ledger records`;
+    await run();
+  } finally {
+    btn.classList.remove('running');
+    document.getElementById('reseedBtnLabel').textContent = 'New synthetic batch';
+  }
+}
+
+function playSweep() {
+  ['dotTop','dotBot'].forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('run');
+    void el.offsetWidth;
+    el.classList.add('run');
+  });
+  document.getElementById('pathTop').classList.add('active');
+  document.getElementById('pathBot').classList.add('active');
+}
+
+async function load() {
+  const [report, st, priority] = await Promise.all([
+    fetch('/api/report').then(r => r.json()),
+    fetch('/api/state').then(r => r.json()),
+    fetch('/api/priority').then(r => r.json()),
+  ]);
+  state.report = report;
+  state.exceptions = st.exceptions || [];
+  state.matches = st.matches || [];
+  state.audit = st.audit || [];
+  state.priority = priority || [];
+  document.getElementById('sweepGateway').textContent = report.TotalGateway;
+  document.getElementById('sweepLedger').textContent = report.TotalLedger;
+  renderMetrics(report);
+  renderCashStrip(report);
+  renderReasonBars(report.PendingByReason || {});
+  renderExceptions();
+  renderMatches();
+  renderAudit();
+  renderPriority();
+  populateReasonFilter(report.ExceptionsByReason || {});
+}
+
+async function loadSummary() {
+  const el = document.getElementById('summaryText');
+  el.className = ''; el.textContent = 'Generating...';
+  try {
+    const res = await fetch('/api/summary').then(r => r.json());
+    el.textContent = res.summary;
+  } catch (e) {
+    el.textContent = 'Summary unavailable.';
+  }
+}
+
+function fmtINR(paise) {
+  return '\u20b9' + (paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function animateNumber(el, to, suffix) {
+  const from = 0, dur = 500, start = performance.now();
+  function tick(now) {
+    const p = Math.min(1, (now - start) / dur);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = (from + (to - from) * eased).toFixed(to % 1 !== 0 ? 1 : 0) + (suffix || '');
+    if (p < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+function renderMetrics(m) {
+  const cards = [
+    ['Match rate', m.MatchRate*100, '%', 'teal'],
+    ['Precision', m.Precision*100, '%', 'teal'],
+    ['Recall', m.Recall*100, '%', 'teal'],
+    ['Correct matches', m.CorrectMatches, '', ''],
+    ['Missed matches', m.MissedMatches, '', 'amber'],
+    ['Wrong matches', m.IncorrectMatches, '', 'red'],
+  ];
+  const grid = document.getElementById('metricGrid');
+  grid.innerHTML = cards.map(([label,,,cls]) =>
+    `<div class="card"><div class="label">${label}</div><div class="value ${cls}"></div></div>`
+  ).join('');
+  grid.querySelectorAll('.card').forEach((card, i) => {
+    animateNumber(card.querySelector('.value'), cards[i][1], cards[i][2]);
+  });
+}
+
+function renderCashStrip(m) {
+  document.getElementById('cashStrip').innerHTML = `
+    <div class="cash-card reconciled">
+      <div class="label">Reconciled</div>
+      <div class="amount">${fmtINR(m.ReconciledPaise)}</div>
+    </div>
+    <div class="cash-card pending">
+      <div class="label">Pending - gateway side</div>
+      <div class="amount">${fmtINR(m.PendingGatewayPaise)}</div>
+    </div>
+    <div class="cash-card pending">
+      <div class="label">Pending - ledger side</div>
+      <div class="amount">${fmtINR(m.PendingLedgerPaise)}</div>
+    </div>`;
+}
+
+function renderReasonBars(pendingByReason) {
+  const entries = Object.entries(pendingByReason).filter(([,v]) => v > 0);
+  const max = Math.max(1, ...entries.map(([,v]) => v));
+  const el = document.getElementById('reasonBars');
+  if (!entries.length) { el.innerHTML = '<div class="empty">No money at risk — everything reconciled or no run yet.</div>'; return; }
+  entries.sort((a,b) => b[1] - a[1]);
+  el.innerHTML = entries.map(([reason, paise]) => `
+    <div class="reason-bar-row">
+      <div class="name">${reason}</div>
+      <div class="reason-bar-track"><div class="reason-bar-fill" data-w="${(paise/max*100)}"></div></div>
+      <div class="n">${fmtINR(paise)}</div>
+    </div>`).join('');
+  requestAnimationFrame(() => {
+    el.querySelectorAll('.reason-bar-fill').forEach(bar => { bar.style.width = bar.dataset.w + '%'; });
+  });
+}
+
+function renderPriority() {
+  document.getElementById('pCount').textContent = `(${state.priority.length})`;
+  const body = state.priority.map(p => `<tr class="row">
+    <td><span class="tag risk-${p.risk_band}">${p.risk_band}</span></td>
+    <td class="mono">${p.risk_score}</td>
+    <td><span class="tag exception">${p.kind}</span></td>
+    <td class="mono">${p.record_id}</td>
+    <td class="mono">${fmtINR(p.amount_paise)}</td>
+    <td class="reasoning">${p.reason}</td>
+  </tr>`).join('');
+  document.querySelector('#pTable tbody').innerHTML = body || '<tr><td colspan="6" class="empty">No open exceptions to prioritize.</td></tr>';
+}
+
+function populateReasonFilter(byReason) {
+  const sel = document.getElementById('exReasonFilter');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">All reasons</option>' +
+    Object.keys(byReason).map(r => `<option value="${r}">${r}</option>`).join('');
+  sel.value = current;
+}
+
+function renderExceptions() {
+  const q = (document.getElementById('exSearch').value || '').toLowerCase();
+  const reasonFilter = document.getElementById('exReasonFilter').value;
+  const list = state.exceptions.filter(e =>
+    (!reasonFilter || e.reason === reasonFilter) &&
+    (!q || e.record_id.toLowerCase().includes(q) || e.reasoning.toLowerCase().includes(q))
+  );
+  document.getElementById('exCount').textContent = `(${list.length} of ${state.exceptions.length})`;
+  const body = list.map(e => `<tr class="row">
+    <td><span class="tag exception">${e.kind}</span></td>
+    <td class="mono">${e.record_id}</td>
+    <td class="mono">${e.reason}</td>
+    <td class="reasoning">${e.reasoning}</td>
+  </tr>`).join('');
+  document.querySelector('#exTable tbody').innerHTML = body || '<tr><td colspan="4" class="empty">No exceptions match this filter.</td></tr>';
+}
+
+function renderMatches() {
+  const q = (document.getElementById('mSearch').value || '').toLowerCase();
+  const list = state.matches.filter(m => !q || m.gateway_id.toLowerCase().includes(q) || m.ledger_id.toLowerCase().includes(q));
+  document.getElementById('mCount').textContent = `(${list.length} of ${state.matches.length})`;
+  const body = list.slice(0, 200).map(m => `<tr class="row">
+    <td class="mono">${m.gateway_id}</td>
+    <td class="mono">${m.ledger_id}</td>
+    <td><span class="tag ${m.confidence === 'exact_reference' ? 'match-exact' : 'match-fuzzy'}">${m.confidence}</span></td>
+    <td class="reasoning">${m.reasoning}</td>
+  </tr>`).join('');
+  document.querySelector('#mTable tbody').innerHTML = body || '<tr><td colspan="4" class="empty">No matches yet - run reconciliation first.</td></tr>';
+}
+
+function renderAudit() {
+  document.getElementById('aCount').textContent = `(${state.audit.length})`;
+  const log = document.getElementById('auditLog');
+  if (!state.audit.length) { log.innerHTML = '<div class="empty">No audit entries yet.</div>'; return; }
+  log.innerHTML = state.audit.slice().reverse().map(a => `
+    <div class="audit-entry">
+      <div class="ts">${new Date(a.timestamp).toLocaleTimeString()}</div>
+      <div class="action ${a.action}">${a.action}</div>
+      <div class="detail">${a.detail}</div>
+    </div>`).join('');
+}
+
+document.getElementById('runBtn').addEventListener('click', run);
+document.getElementById('reseedBtn').addEventListener('click', reseedAndRun);
+document.getElementById('exSearch').addEventListener('input', renderExceptions);
+document.getElementById('exReasonFilter').addEventListener('change', renderExceptions);
+document.getElementById('mSearch').addEventListener('input', renderMatches);
+document.getElementById('exportCsvBtn').addEventListener('click', () => {
+  window.location.href = '/api/export/exceptions.csv';
+});
+
+load();
+</script>
+</body>
+</html>
